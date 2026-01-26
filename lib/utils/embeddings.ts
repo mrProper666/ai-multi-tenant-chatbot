@@ -31,13 +31,42 @@ function getOpenAIClient(): OpenAI {
 export async function generateEmbedding(text: string): Promise<number[]> {
   const client = getOpenAIClient();
   
-  const response = await client.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: text,
-    dimensions: EMBEDDING_DIMENSIONS,
-  });
+  try {
+    const response = await client.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: text,
+      dimensions: EMBEDDING_DIMENSIONS,
+    });
 
-  return response.data[0].embedding;
+    return response.data[0].embedding;
+  } catch (error: any) {
+    // Provide more helpful error messages for common OpenAI API errors
+    if (error?.status === 429) {
+      if (error?.code === 'insufficient_quota') {
+        throw new Error(
+          'OpenAI API quota exceeded. Please check your OpenAI billing and plan details. ' +
+          'Visit https://platform.openai.com/account/billing to add credits or upgrade your plan.'
+        );
+      } else {
+        throw new Error(
+          'OpenAI API rate limit exceeded. Please try again in a few moments.'
+        );
+      }
+    }
+    
+    if (error?.status === 401) {
+      throw new Error(
+        'OpenAI API authentication failed. Please check your OPENAI_API_KEY environment variable.'
+      );
+    }
+    
+    // Re-throw with original message if it's already a helpful error
+    if (error?.message) {
+      throw error;
+    }
+    
+    throw new Error(`Failed to generate embedding: ${error?.toString() || 'Unknown error'}`);
+  }
 }
 
 /**
@@ -46,11 +75,40 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
   const client = getOpenAIClient();
   
-  const response = await client.embeddings.create({
-    model: EMBEDDING_MODEL,
-    input: texts,
-    dimensions: EMBEDDING_DIMENSIONS,
-  });
+  try {
+    const response = await client.embeddings.create({
+      model: EMBEDDING_MODEL,
+      input: texts,
+      dimensions: EMBEDDING_DIMENSIONS,
+    });
 
-  return response.data.map(item => item.embedding);
+    return response.data.map(item => item.embedding);
+  } catch (error: any) {
+    // Provide more helpful error messages for common OpenAI API errors
+    if (error?.status === 429) {
+      if (error?.code === 'insufficient_quota') {
+        throw new Error(
+          'OpenAI API quota exceeded. Please check your OpenAI billing and plan details. ' +
+          'Visit https://platform.openai.com/account/billing to add credits or upgrade your plan.'
+        );
+      } else {
+        throw new Error(
+          'OpenAI API rate limit exceeded. Please try again in a few moments.'
+        );
+      }
+    }
+    
+    if (error?.status === 401) {
+      throw new Error(
+        'OpenAI API authentication failed. Please check your OPENAI_API_KEY environment variable.'
+      );
+    }
+    
+    // Re-throw with original message if it's already a helpful error
+    if (error?.message) {
+      throw error;
+    }
+    
+    throw new Error(`Failed to generate embeddings: ${error?.toString() || 'Unknown error'}`);
+  }
 }

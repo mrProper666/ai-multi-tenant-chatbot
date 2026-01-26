@@ -83,9 +83,23 @@ export async function POST(request: NextRequest) {
     });
   } catch (error: any) {
     console.error('Error uploading document:', error);
+    
+    // Return appropriate status codes based on error type
+    let status = 500;
+    let errorMessage = error.message || 'Failed to upload document';
+    
+    // Handle OpenAI API errors with appropriate status codes
+    if (errorMessage.includes('quota exceeded') || errorMessage.includes('rate limit')) {
+      status = 503; // Service Unavailable
+    } else if (errorMessage.includes('authentication failed')) {
+      status = 401; // Unauthorized
+    } else if (errorMessage.includes('No file provided') || errorMessage.includes('Only PDF')) {
+      status = 400; // Bad Request
+    }
+    
     return NextResponse.json(
-      { error: error.message || 'Failed to upload document' },
-      { status: 500 }
+      { error: errorMessage },
+      { status }
     );
   }
 }

@@ -210,16 +210,108 @@ The application uses a connection pool. Ensure your PostgreSQL instance has:
 
 The application supports any S3-compatible storage:
 - AWS S3
+- **Cloudflare R2** (recommended for cost-effective storage)
 - MinIO
 - DigitalOcean Spaces
 - Other S3-compatible services
 
 Configure via:
 - `S3_ENDPOINT`: Storage endpoint URL
-- `S3_REGION`: Region (e.g., `us-east-1`)
-- `S3_ACCESS_KEY_ID`: Access key
-- `S3_SECRET_ACCESS_KEY`: Secret key
+  - For Cloudflare R2: `https://{account-id}.r2.cloudflarestorage.com`
+- `S3_REGION`: Region
+  - For AWS S3: Use actual region (e.g., `us-east-1`, `eu-central-1`)
+  - For Cloudflare R2: Can be `auto` or any value (R2 doesn't enforce regions)
+- `S3_ACCESS_KEY_ID`: Access key (R2 API Token)
+- `S3_SECRET_ACCESS_KEY`: Secret key (R2 Secret Access Key)
 - `S3_BUCKET_NAME`: Bucket name
+
+#### How to Get Cloudflare R2 API Credentials
+
+**⚠️ IMPORTANT**: Make sure you're creating an **R2 API Token**, not a general Cloudflare API Token. These are different things!
+
+**Step 1: Access R2 in Cloudflare Dashboard**
+1. Log in to your [Cloudflare Dashboard](https://dash.cloudflare.com/)
+2. Navigate to **R2** in the left sidebar (under "Storage")
+3. If you haven't purchased R2 yet, you'll need to enable it first
+
+**Step 2: Create an R2 API Token**
+1. In the R2 page, click on **"Manage R2 API Tokens"** or **"API Tokens"** button
+   - This should be on the R2 overview page, NOT in the general API Tokens section
+2. You'll see two options:
+   - **Create Account API Token** (tied to your Cloudflare account; requires Super Administrator role)
+   - **Create User API Token** (tied to your individual user account)
+3. Choose the appropriate option based on your needs
+
+**Step 3: Configure Token Permissions**
+1. **Token Name**: Give it a descriptive name (e.g., "AI Chatbot Storage")
+2. **Permissions**: Select one of:
+   - **Admin Read & Write** - Full access to all buckets (recommended for development)
+   - **Admin Read only** - Read-only access to all buckets
+   - **Object Read & Write** - Read/write access to specific buckets (more secure)
+   - **Object Read only** - Read-only access to specific buckets
+3. If you chose Object permissions, select the specific bucket(s) you want to grant access to
+4. Click **"Create Account API Token"** or **"Create User API Token"**
+
+**Step 4: Copy Your Credentials - THIS IS CRITICAL!**
+⚠️ **VERY IMPORTANT**: After clicking "Create", a modal/popup will appear showing BOTH credentials:
+- **Access Key ID** (also called Client ID) - this is your `S3_ACCESS_KEY_ID`
+- **Secret Access Key** (also called Client Secret) - this is your `S3_SECRET_ACCESS_KEY`
+
+**The Secret Access Key is shown ONLY ONCE and cannot be retrieved later!**
+
+**What to do if you only see Access Key ID:**
+- If you only see the Access Key ID in a list of tokens, it means you've already closed the creation modal
+- The Secret Access Key was shown in the initial creation confirmation popup
+- **Solution**: You need to create a NEW token and this time:
+  1. **DO NOT close the popup/modal** that appears after creation
+  2. Look for BOTH values displayed together
+  3. Copy BOTH immediately before closing anything
+  4. The Secret Access Key might be in a separate field or shown below the Access Key ID
+
+**Alternative: Check if Secret is shown elsewhere**
+- Sometimes the Secret Access Key appears in a separate section or requires clicking "Show" or "Reveal"
+- Look for buttons like "Show Secret", "Reveal", or similar
+- Check if there's a copy icon next to the Secret Access Key
+
+**Step 5: Find Your Account ID**
+1. In the Cloudflare Dashboard, go to any page
+2. Your **Account ID** is visible in the right sidebar
+3. Use this to construct your endpoint: `https://{account-id}.r2.cloudflarestorage.com`
+
+**Step 6: Update Your .env.local**
+```bash
+S3_ENDPOINT=https://{your-account-id}.r2.cloudflarestorage.com
+S3_REGION=auto
+S3_ACCESS_KEY_ID={your-access-key-id}
+S3_SECRET_ACCESS_KEY={your-secret-access-key}
+S3_BUCKET_NAME={your-bucket-name}
+```
+
+**Troubleshooting:**
+
+- **If you only see Access Key ID after creation**: 
+  - The Secret Access Key should appear in the SAME popup/modal right after creation
+  - Look carefully - it might be below the Access Key ID or in a separate field
+  - Check if there's a "Show" or "Reveal" button to display the secret
+  - If you already closed the popup, the Secret is lost and you need to create a new token
+
+- **If you lost your Secret Access Key**: 
+  - You'll need to delete the old token and create a new one
+  - Go to "Manage R2 API Tokens" → Find your token → Delete it → Create a new one
+  - This time, copy BOTH values before closing the creation popup
+
+- **Alternative: Get credentials via API** (if you have Cloudflare API token):
+  - If the dashboard doesn't show the Secret, you can use the Cloudflare API
+  - When creating a token via API, the response includes both Access Key ID and Secret Access Key
+  - See: https://developers.cloudflare.com/r2/api/tokens/#get-s3-api-credentials-from-an-api-token
+
+- **Make sure you're in R2 section**: 
+  - Don't use general Cloudflare API Tokens (from "My Profile" → "API Tokens")
+  - You MUST use "Manage R2 API Tokens" from the R2 page specifically
+  - General API tokens won't work for S3-compatible access
+
+- **Bucket name**: Make sure your bucket name matches exactly (case-sensitive)
+- **Account ID**: Verify your Account ID is correct in the endpoint URL
 
 ### Embedding Configuration
 

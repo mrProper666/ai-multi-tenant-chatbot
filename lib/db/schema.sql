@@ -61,7 +61,14 @@ CREATE TABLE IF NOT EXISTS messages (
 CREATE INDEX IF NOT EXISTS idx_documents_tenant_id ON documents(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_document_chunks_tenant_id ON document_chunks(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id ON document_chunks(document_id);
-CREATE INDEX IF NOT EXISTS idx_document_chunks_vector ON document_chunks USING ivfflat (vector vector_cosine_ops) WITH (lists = 100);
+CREATE INDEX IF NOT EXISTS idx_document_chunks_vector ON document_chunks USING hnsw ((vector::halfvec(3072)) halfvec_cosine_ops) WITH (m = 16, ef_construction = 64);
 CREATE INDEX IF NOT EXISTS idx_conversations_tenant_id ON conversations(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_messages_conversation_id ON messages(conversation_id);
 CREATE INDEX IF NOT EXISTS idx_messages_tenant_id ON messages(tenant_id);
+
+-- Grant permissions to app_user (adjust username if different)
+-- Note: Run this as a superuser (e.g., postgres user)
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO app_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO app_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO app_user;

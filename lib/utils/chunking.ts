@@ -1,3 +1,4 @@
+// Import tiktoken - WASM should be handled by Next.js webpack config
 import { encoding_for_model } from 'tiktoken';
 
 const CHUNK_SIZE = 800;

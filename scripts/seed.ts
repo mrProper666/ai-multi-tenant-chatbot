@@ -1,4 +1,9 @@
+import { config } from 'dotenv';
+import { resolve } from 'path';
 import { createTenant } from '../lib/db/repositories/tenants';
+
+// Load .env.local file
+config({ path: resolve(process.cwd(), '.env.local') });
 
 async function seed() {
   try {

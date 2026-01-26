@@ -52,7 +52,7 @@ export class PgVectorStore implements VectorStore {
       FROM document_chunks dc
       JOIN documents d ON dc.document_id = d.id
       WHERE dc.tenant_id = $1
-      ORDER BY dc.vector <=> $2::vector
+      ORDER BY dc.vector::halfvec <=> $2::vector::halfvec
       LIMIT $3`,
       [tenantId, JSON.stringify(queryVector), limit]
     );

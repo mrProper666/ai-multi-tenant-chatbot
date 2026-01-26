@@ -1,6 +1,11 @@
+import { config } from 'dotenv';
+import { resolve } from 'path';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { getDbPool } from '../lib/db/client';
+
+// Load .env.local file
+config({ path: resolve(process.cwd(), '.env.local') });
 
 async function migrate() {
   try {

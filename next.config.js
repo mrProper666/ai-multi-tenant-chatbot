@@ -5,6 +5,14 @@ const nextConfig = {
       bodySizeLimit: '10mb',
     },
   },
+  webpack: (config) => {
+    // Handle WASM files for tiktoken
+    config.experiments = {
+      ...config.experiments,
+      asyncWebAssembly: true,
+    };
+    return config;
+  },
 }
 
 module.exports = nextConfig

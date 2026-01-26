@@ -3,21 +3,22 @@ import { Readable } from 'stream';
 
 /**
  * S3-compatible storage abstraction
+ * Supports AWS S3, Cloudflare R2, MinIO, and other S3-compatible services
  */
 export interface FileStorage {
   /**
-   * Upload a file to S3
-   * Returns the S3 key
+   * Upload a file to storage
+   * Returns the storage key
    */
   uploadFile(tenantId: string, documentId: string, filename: string, buffer: Buffer): Promise<string>;
 
   /**
-   * Download a file from S3
+   * Download a file from storage
    */
   getFile(tenantId: string, documentId: string): Promise<Buffer>;
 
   /**
-   * Delete a file from S3
+   * Delete a file from storage
    */
   deleteFile(tenantId: string, documentId: string): Promise<void>;
 }
@@ -33,14 +34,30 @@ export class S3FileStorage implements FileStorage {
       throw new Error('S3_BUCKET_NAME environment variable is not set');
     }
 
+    const endpoint = process.env.S3_ENDPOINT;
+    const accessKeyId = process.env.S3_ACCESS_KEY_ID || '';
+    const secretAccessKey = process.env.S3_SECRET_ACCESS_KEY || '';
+
+    if (!endpoint) {
+      throw new Error('S3_ENDPOINT environment variable is not set');
+    }
+
+    if (!accessKeyId || !secretAccessKey) {
+      throw new Error('S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY environment variables are required');
+    }
+
+    // For Cloudflare R2, region can be "auto" or any value (R2 doesn't enforce regions)
+    // For other S3-compatible services, use the provided region or default to us-east-1
+    const region = process.env.S3_REGION || 'auto';
+
     this.client = new S3Client({
-      endpoint: process.env.S3_ENDPOINT,
-      region: process.env.S3_REGION || 'us-east-1',
+      endpoint: endpoint,
+      region: region,
       credentials: {
-        accessKeyId: process.env.S3_ACCESS_KEY_ID || '',
-        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY || '',
+        accessKeyId: accessKeyId,
+        secretAccessKey: secretAccessKey,
       },
-      forcePathStyle: true, // For S3-compatible services like MinIO
+      forcePathStyle: true, // Required for Cloudflare R2 and other S3-compatible services
     });
   }
 
