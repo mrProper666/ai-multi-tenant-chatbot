@@ -1,6 +1,11 @@
+export type ModelId = `${string}/${string}`;
+
 export interface Tenant {
   id: string;
   name: string;
+  llm_model_id: ModelId;
+  embedding_model_id: ModelId;
+  embedding_dimensions: number;
   created_at: Date;
   updated_at: Date;
 }

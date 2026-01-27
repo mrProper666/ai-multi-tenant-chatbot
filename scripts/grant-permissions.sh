@@ -14,6 +14,27 @@ GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DB_USER;
 GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DB_USER;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DB_USER;
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $DB_USER;
+
+-- Ensure $DB_USER can run ALTER TABLE migrations (DDL requires ownership)
+DO \$\$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN
+    SELECT tablename
+    FROM pg_tables
+    WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I OWNER TO $DB_USER', r.tablename);
+  END LOOP;
+
+  FOR r IN
+    SELECT sequencename
+    FROM pg_sequences
+    WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER SEQUENCE public.%I OWNER TO $DB_USER', r.sequencename);
+  END LOOP;
+END \$\$;
 EOF
 
 if [ $? -eq 0 ]; then

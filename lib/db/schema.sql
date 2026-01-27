@@ -9,6 +9,18 @@ CREATE TABLE IF NOT EXISTS tenants (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
+-- Tenant model settings (AI Gateway / provider-model ids)
+-- Stored as '<provider>/<model>' strings, e.g. 'openai/gpt-4o-mini', 'anthropic/claude-sonnet-4.5'
+ALTER TABLE tenants
+  ADD COLUMN IF NOT EXISTS llm_model_id VARCHAR(200) NOT NULL DEFAULT 'openai/gpt-4o-mini';
+
+ALTER TABLE tenants
+  ADD COLUMN IF NOT EXISTS embedding_model_id VARCHAR(200) NOT NULL DEFAULT 'openai/text-embedding-3-large';
+
+-- Must match the pgvector dimension in document_chunks.vector (currently vector(3072))
+ALTER TABLE tenants
+  ADD COLUMN IF NOT EXISTS embedding_dimensions INTEGER NOT NULL DEFAULT 3072;
+
 -- Documents table
 CREATE TABLE IF NOT EXISTS documents (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

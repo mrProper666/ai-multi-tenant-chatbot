@@ -1,22 +1,21 @@
 import { getDbPool } from '../client';
 import { Document } from '@/lib/types';
-import { v4 as uuidv4 } from 'uuid';
 
 export async function createDocument(
   tenantId: string,
+  documentId: string,
   filename: string,
   s3Key: string,
   fileSize: number,
   pageCount: number | null = null
 ): Promise<Document> {
   const pool = getDbPool();
-  const id = uuidv4();
 
   const result = await pool.query<Document>(
     `INSERT INTO documents (id, tenant_id, filename, s3_key, file_size, page_count)
      VALUES ($1, $2, $3, $4, $5, $6)
      RETURNING *`,
-    [id, tenantId, filename, s3Key, fileSize, pageCount]
+    [documentId, tenantId, filename, s3Key, fileSize, pageCount]
   );
 
   return result.rows[0];

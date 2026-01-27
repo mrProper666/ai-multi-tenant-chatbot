@@ -13,6 +13,34 @@ This application provides:
 - **Citation support** for traceability
 - **Production-ready architecture** with abstractions for future scalability
 
+## Recent changes (Provider selection + Vercel AI Gateway)
+
+This repo was updated to support **tenant-selectable AI models** using the **Vercel AI Gateway** and the AI SDK `provider/model` format.
+
+- **Tenant model settings in DB**:
+  - Added `tenants.llm_model_id` (example: `anthropic/claude-sonnet-4.5`)
+  - Added `tenants.embedding_model_id` (example: `google/gemini-embedding-001`)
+  - Added `tenants.embedding_dimensions` (must match `document_chunks.vector(N)`)
+- **Allowlist + validation**:
+  - Added `lib/ai/models.ts` with a small allowlist for LLM/embedding models and dimensions validation
+- **Settings API**:
+  - Added `GET/PATCH /api/tenants/settings` to read/update a tenant’s `llm_model_id` and `embedding_model_id`
+- **Settings UI**:
+  - Added a new **Settings** tab with `components/ProviderSettings.tsx` to change models per tenant
+  - Shows a warning that changing the embedding model requires **re-embedding existing documents**
+- **Chat API uses tenant model**:
+  - `app/api/chat/route.ts` now uses the tenant’s `llm_model_id` (via AI SDK + Gateway) instead of a hardcoded OpenAI model
+- **Embeddings use tenant model + batching**:
+  - `lib/utils/embeddings.ts` now uses `embed/embedMany` (AI SDK + Gateway) and respects per-provider batch limits by chunking `embedMany()` calls (safe default: 100)
+- **Document upload FK fix**:
+  - Fixed a mismatch where `documents.id` and `document_chunks.document_id` could diverge during upload
+- **Migration improvements**:
+  - `scripts/migrate.ts` now supports `DATABASE_MIGRATION_URL` for running DDL as an elevated/owner user (fixes “must be owner of table …”)
+  - The migration runner now correctly executes SQL statements that are preceded by `--` comments
+- **Build/lint scripts**:
+  - `npm run build` uses `next build --webpack` (Next 16 + custom webpack config for `tiktoken`)
+  - `npm run lint` runs `tsc --noEmit` (typecheck)
+
 ## Architecture Overview
 
 ### Tech Stack
@@ -161,7 +189,7 @@ cp .env.example .env
 
 Required variables:
 - `DATABASE_URL`: PostgreSQL connection string
-- `OPENAI_API_KEY`: Your OpenAI API key
+- `AI_GATEWAY_API_KEY`: Optional (recommended for local dev without `vercel dev`)
 - `S3_*`: S3-compatible storage credentials
 - `TENANT_HEADER_NAME`: Header name for tenant ID (default: `X-Tenant-Id`)
 
@@ -315,9 +343,8 @@ S3_BUCKET_NAME={your-bucket-name}
 
 ### Embedding Configuration
 
-- `EMBEDDING_PROVIDER`: Currently only `openai` (fixed)
-- `EMBEDDING_MODEL`: `text-embedding-3-large` (fixed)
-- `VERCEL_AI_GATEWAY_URL`: Optional Vercel AI Gateway endpoint
+- Embeddings are generated via **Vercel AI Gateway** using a tenant-selected `embedding_model_id` in the format `provider/model`.
+- The vector column is currently `vector(3072)`, so the chosen embedding model must output **3072 dimensions** unless you migrate/re-embed.
 
 ## Troubleshooting
 
@@ -335,9 +362,9 @@ S3_BUCKET_NAME={your-bucket-name}
 
 ### Embedding Generation Failures
 
-- Verify `OPENAI_API_KEY` is set and valid
-- Check API rate limits
-- Ensure sufficient OpenAI credits
+- If running locally, verify `AI_GATEWAY_API_KEY` is set (or use `vercel dev` for OIDC).
+- In Vercel, verify AI Gateway is enabled and BYOK credentials are configured for the chosen provider/model.
+- Check provider rate limits/credits in the Vercel AI Gateway dashboard.
 
 ### S3 Upload Failures
 

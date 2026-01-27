@@ -1,40 +1,23 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useChat } from '@ai-sdk/react';
 
 interface ChatInterfaceProps {
   tenantId: string;
 }
 
+type SimpleMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+};
+
 export default function ChatInterface({ tenantId }: ChatInterfaceProps) {
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [localInput, setLocalInput] = useState<string>('');
+  const [messages, setMessages] = useState<SimpleMessage[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
-  const { messages, input, handleInputChange, handleSubmit, isLoading, setMessages, setInput, append } = useChat({
-    api: '/api/chat',
-    headers: {
-      'X-Tenant-Id': tenantId,
-    },
-    body: conversationId ? {
-      conversationId,
-    } : undefined,
-    onResponse: async (response) => {
-      // Extract conversation ID from response headers
-      const convId = response.headers.get('X-Conversation-Id');
-      if (convId && !conversationId) {
-        setConversationId(convId);
-      }
-    },
-  });
-
-  // Sync local input with useChat input
-  useEffect(() => {
-    if (input !== undefined && input !== null) {
-      setLocalInput(input);
-    }
-  }, [input]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -44,14 +27,6 @@ export default function ChatInterface({ tenantId }: ChatInterfaceProps) {
   const handleInputChangeDirect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setLocalInput(value);
-    // Update useChat's input state
-    if (setInput) {
-      setInput(value);
-    }
-    // Also call handleInputChange if available
-    if (handleInputChange) {
-      handleInputChange(e);
-    }
   };
 
   const handleFormSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -64,32 +39,17 @@ export default function ChatInterface({ tenantId }: ChatInterfaceProps) {
     
     // Clear local input immediately
     setLocalInput('');
-    
-    // Try to use append first (most reliable)
-    if (append && typeof append === 'function') {
-      try {
-        await append({
-          role: 'user',
-          content: messageText,
-        });
-        return;
-      } catch (error) {
-        console.error('Error using append:', error);
-      }
-    }
-    
-    // Fallback: manually send message using fetch
+
     try {
       // Add user message to UI immediately
-      const userMessage = {
+      const userMessage: SimpleMessage = {
         id: `user-${Date.now()}`,
-        role: 'user' as const,
+        role: 'user',
         content: messageText,
       };
       
-      if (setMessages) {
-        setMessages([...messages, userMessage]);
-      }
+      setMessages(prev => [...prev, userMessage]);
+      setIsLoading(true);
       
       // Send to API
       const response = await fetch('/api/chat', {
@@ -114,11 +74,7 @@ export default function ChatInterface({ tenantId }: ChatInterfaceProps) {
         setConversationId(convId);
       }
 
-      // Handle streaming response using useChat's mechanism
-      // The response should be compatible with useChat's expected format
       if (response.body) {
-        // useChat will handle the streaming if we set the input and trigger handleSubmit
-        // But since that's not working, let's manually process the stream
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let assistantContent = '';
@@ -131,36 +87,48 @@ export default function ChatInterface({ tenantId }: ChatInterfaceProps) {
           const chunk = decoder.decode(value, { stream: true });
           const lines = chunk.split('\n').filter(line => line.trim());
 
+          // Prefer AI SDK "data stream" lines (0:... JSON). If not present, treat as plain text stream.
+          let sawDataStream = false;
           for (const line of lines) {
-            if (line.startsWith('0:')) {
-              try {
-                const data = JSON.parse(line.slice(2));
-                if (data.type === 'text-delta' && data.textDelta) {
-                  assistantContent += data.textDelta;
-                  
-                  // Update messages
-                  if (setMessages) {
-                    const assistantMsg = {
-                      id: assistantMessageId,
-                      role: 'assistant' as const,
-                      content: assistantContent,
-                    };
-                    setMessages([...messages, userMessage, assistantMsg]);
-                  }
-                }
-              } catch (e) {
-                // Skip invalid JSON
+            if (!line.startsWith('0:')) continue;
+            sawDataStream = true;
+            try {
+              const data = JSON.parse(line.slice(2));
+              if (data.type === 'text-delta' && data.textDelta) {
+                assistantContent += data.textDelta;
               }
+            } catch {
+              // ignore malformed JSON
             }
           }
+          if (!sawDataStream) {
+            assistantContent += chunk;
+          }
+
+          const assistantMsg: SimpleMessage = {
+            id: assistantMessageId,
+            role: 'assistant',
+            content: assistantContent,
+          };
+          setMessages(prev => {
+            const withoutAssistant = prev.filter(m => m.id !== assistantMessageId);
+            return [...withoutAssistant, assistantMsg];
+          });
         }
       }
     } catch (error) {
       console.error('Error sending message:', error);
-      // Remove user message on error
-      if (setMessages) {
-        setMessages(messages);
-      }
+      // best-effort: show error as assistant message
+      setMessages(prev => [
+        ...prev,
+        {
+          id: `assistant-error-${Date.now()}`,
+          role: 'assistant',
+          content: 'An error occurred while sending your message. Please try again.',
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
     }
   };
 

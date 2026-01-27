@@ -14,7 +14,7 @@ export async function retrieveRelevantChunks(
   limit: number = 7
 ): Promise<ChunkWithMetadata[]> {
   // Generate embedding for the query
-  const queryEmbedding = await generateEmbedding(query);
+  const queryEmbedding = await generateEmbedding(query, tenantId);
 
   // Search for similar chunks (already tenant-filtered)
   const chunks = await vectorStore.searchSimilar(tenantId, queryEmbedding, limit);

@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
 import { streamText } from 'ai';
-import { openai } from '@ai-sdk/openai';
 import { getTenantId } from '@/lib/utils/tenant';
 import { retrieveRelevantChunks, formatChunksForContext, extractCitations } from '@/lib/retrieval';
 import { createConversation, getConversationById, createMessage, getConversationMessages } from '@/lib/db/repositories/conversations';
-import { v4 as uuidv4 } from 'uuid';
+import { getTenantModelSettings } from '@/lib/db/repositories/tenants';
+import { assertAllowedLlmModelId } from '@/lib/ai/models';
 
 const SYSTEM_PROMPT = `You are an AI assistant designed to support non-governmental organizations (NGOs).
 
@@ -51,6 +51,13 @@ Trustworthiness and fidelity to the source documents are your highest priority.`
 export async function POST(request: NextRequest) {
   try {
     const tenantId = await getTenantId();
+    const tenantModelSettings = await getTenantModelSettings(tenantId);
+    if (!tenantModelSettings) {
+      return new Response('Tenant not found', { status: 404 });
+    }
+
+    assertAllowedLlmModelId(tenantModelSettings.llm_model_id);
+
     const body = await request.json();
     const { message, conversationId } = body;
 
@@ -111,8 +118,14 @@ export async function POST(request: NextRequest) {
 
     // Stream response
     const result = await streamText({
-      model: openai('gpt-4-turbo-preview'),
+      model: tenantModelSettings.llm_model_id,
       system: SYSTEM_PROMPT,
+      providerOptions: {
+        gateway: {
+          user: tenantId,
+          tags: ['chat'],
+        },
+      },
       messages: [
         ...historyMessages,
         {
@@ -127,7 +140,10 @@ export async function POST(request: NextRequest) {
     });
 
     // Add conversation ID to the response headers
-    const stream = result.toDataStreamResponse();
+    // Prefer Data Stream protocol (for @ai-sdk/react useChat), fallback to text stream if unavailable.
+    const stream =
+      ((result as any).toDataStreamResponse?.() as Response | undefined) ??
+      result.toTextStreamResponse();
     stream.headers.set('X-Conversation-Id', convId);
     
     return stream;

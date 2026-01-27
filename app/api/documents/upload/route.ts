@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
     
     const document = await createDocument(
       tenantId,
+      documentId,
       file.name,
       s3Key,
       buffer.length,
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // Generate embeddings for all chunks
     const chunkTexts = chunks.map(c => c.content);
-    const embeddings = await generateEmbeddings(chunkTexts);
+    const embeddings = await generateEmbeddings(chunkTexts, tenantId);
 
     // Store chunks with embeddings
     for (let i = 0; i < chunks.length; i++) {
